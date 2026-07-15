@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>薬剤希釈計算 | 外壁洗浄</title>
+<style>
+  :root{
+    --ink:#22282c;
+    --paper:#f0eee7;
+    --panel:#ffffff;
+    --line:#d8d4c8;
+    --safety:#e8a400;
+    --safety-dark:#a86e00;
+    --danger:#b5442e;
+    --danger-bg:#fbeee4;
+    --ok:#3f7a56;
+    --ok-bg:#e9f2ec;
+    --water:#3f7a8c;
+    --concentrate:#7a5a2e;
+    --mono: "SFMono-Regular","Menlo","Consolas",monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased; padding-bottom:40px;
+  }
+  header{ background:var(--ink); color:var(--paper); padding:22px 20px 20px; position:relative; overflow:hidden; }
+  header::after{
+    content:""; position:absolute; right:-30px; top:-30px; width:140px; height:140px;
+    background:repeating-linear-gradient(45deg,var(--safety) 0 14px, var(--ink) 14px 28px);
+    opacity:.9; border-radius:50%;
+  }
+  .eyebrow{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--safety); font-weight:700; margin-bottom:6px; }
+  h1{ margin:0; font-size:24px; font-weight:800; letter-spacing:.01em; line-height:1.3; }
+  .sub{ margin-top:6px; font-size:13px; color:#c9c5ba; max-width:80%; }
+
+  main{ padding:16px; max-width:520px; margin:0 auto; }
+
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:18px; margin-top:16px; }
+  .card-title{
+    font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#8a8578; font-weight:700;
+    margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .card-title::before{ content:""; width:6px;height:6px; background:var(--safety); display:inline-block; }
+
+  .always-warn{
+    background:#2b2420; color:var(--paper); border:1px solid #4a3f34; border-radius:4px;
+    padding:16px 18px; margin-top:16px;
+  }
+  .always-warn .card-title{ color:var(--safety); margin-bottom:10px; }
+  .always-warn .card-title::before{ background:var(--safety); }
+  .always-warn ul{ margin:0; padding-left:18px; font-size:12.5px; line-height:1.8; }
+  .always-warn li{ margin-bottom:4px; }
+
+  .preset-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .preset-btn{
+    flex:1 1 auto; min-width:90px; border:1px solid var(--line); background:var(--paper);
+    padding:10px 8px; border-radius:3px; font-size:12px; font-weight:600; color:var(--ink);
+    cursor:pointer; text-align:center; transition:.15s;
+  }
+  .preset-btn.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .preset-btn.material.active{ background:var(--concentrate); border-color:var(--concentrate); }
+
+  label{ display:block; font-size:12px; font-weight:700; color:#5a564c; margin-bottom:6px; }
+  .field{ margin-bottom:16px; }
+  .input-wrap{
+    display:flex; align-items:center; border:1px solid var(--line); border-radius:3px; overflow:hidden; background:var(--paper);
+  }
+  .input-wrap input, .input-wrap select{
+    flex:1; border:none; background:transparent; padding:12px; font-size:18px; font-family:var(--mono);
+    font-weight:700; color:var(--ink); min-width:0;
+  }
+  .input-wrap input:focus, .input-wrap select:focus{ outline:2px solid var(--safety-dark); outline-offset:-2px; }
+  .unit{ padding:0 12px; font-size:13px; color:#8a8578; font-weight:700; white-space:nowrap; }
+  .hint{ font-size:11px; color:#9a9584; margin-top:5px; }
+
+  .safety-block{ margin-top:14px; }
+  .ppe-row{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .ppe-chip{ font-size:11px; font-weight:700; background:var(--paper); border:1px solid var(--line); padding:6px 10px; border-radius:999px; color:#5a564c; }
+  .mix-warn{ margin-top:10px; font-size:12.5px; background:var(--danger-bg); border-left:3px solid var(--danger); padding:10px 12px; color:#7a3323; border-radius:2px; }
+
+  .compat-box{ margin-top:14px; font-size:12.5px; padding:12px; border-radius:2px; border-left:3px solid var(--line); }
+  .compat-box.ok{ background:var(--ok-bg); border-left-color:var(--ok); color:#2c5a3f; }
+  .compat-box.caution{ background:#fbf3df; border-left-color:var(--safety-dark); color:#6b4d00; }
+  .compat-box.no{ background:var(--danger-bg); border-left-color:var(--danger); color:#7a3323; }
+  .compat-title{ font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .compat-est{ margin-top:6px; font-size:11.5px; font-style:italic; opacity:.85; }
+
+  .result-card{ background:var(--ink); color:var(--paper); border-radius:4px; padding:20px; margin-top:16px; display:flex; gap:18px; align-items:center; }
+  .beaker-wrap{ flex:0 0 64px; }
+  svg{ display:block; }
+  .result-nums{ flex:1; }
+  .result-row{ display:flex; justify-content:space-between; align-items:baseline; padding:7px 0; border-bottom:1px solid rgba(240,238,231,.15); }
+  .result-row:last-child{ border-bottom:none; }
+  .result-label{ font-size:12px; color:#b8b4a8; }
+  .result-value{ font-family:var(--mono); font-size:19px; font-weight:800; }
+  .result-value.water{ color:#8fc4d6; }
+  .result-value.conc{ color:var(--safety); }
+  .gram-emphasis{
+    font-size:16px; font-weight:800; line-height:1.5; margin-bottom:10px;
+    padding-bottom:10px; border-bottom:1px solid rgba(240,238,231,.15);
+  }
+  .gram-emphasis .num{ color:var(--safety); font-family:var(--mono); }
+
+  .warn{ margin-top:12px; font-size:12px; background:var(--danger-bg); border-left:3px solid var(--danger); padding:10px 12px; color:#7a3323; border-radius:2px; display:none; }
+  .warn.show{ display:block; }
+
+  .rinse-box{ margin-top:12px; font-size:12.5px; background:#e8f0f2; border-left:3px solid var(--water); padding:10px 12px; color:#2c4d57; border-radius:2px; display:none; }
+  .rinse-box.show{ display:block; }
+
+  .ref-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .ref-table th, .ref-table td{ text-align:left; padding:8px 4px; border-bottom:1px solid var(--line); }
+  .ref-table th{ color:#8a8578; font-weight:700; font-size:11px; letter-spacing:.04em; }
+  .ref-table td.num{ font-family:var(--mono); font-weight:700; }
+  .ref-row{ cursor:pointer; }
+  .ref-row:active{ background:var(--paper); }
+
+  .area-body{ display:none; }
+  .area-body.open{ display:block; }
+  .apply-btn{
+    width:100%; margin-top:6px; border:1px solid var(--ink); background:var(--ink); color:var(--paper);
+    padding:12px; border-radius:3px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .apply-btn:active{ opacity:.85; }
+
+  .toggle-arrow{ font-size:11px; color:#8a8578; transition:.15s; margin-left:auto; }
+  .toggle-arrow.open{ transform:rotate(180deg); }
+  .card-title.clickable{ cursor:pointer; }
+
+  .note-static{ font-size:11.5px; color:#8a8578; margin-top:10px; line-height:1.6; }
+
+  footer{ text-align:center; font-size:11px; color:#9a9584; margin-top:24px; padding:0 20px; line-height:1.7; }
+  footer strong{ color:#7a7568; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">一建塗装 現場ツール</div>
+  <h1>薬剤希釈計算</h1>
+  <div class="sub">素材・薬剤を選ぶと、適正濃度と注意点を自動表示します。</div>
+</header>
+
+<main>
+
+  <div class="always-warn">
+    <div class="card-title">使用前に必ず確認</div>
+    <ul>
+      <li>異なる種類の薬剤を、同じ容器・噴霧器で使い回さないでください(残留物との反応で有毒ガスが発生する恐れがあります)</li>
+      <li>薬剤を入れる前に、その容器・噴霧器に直前まで何を入れていたか(薬剤履歴)を必ず確認してください</li>
+      <li>本アプリは次亜塩素酸Na・中性洗剤・セスキ炭酸ソーダなど比較的扱いやすい薬剤を対象にしています。酸性洗浄剤や業務用の強アルカリ洗浄剤は対象外です</li>
+      <li>本アプリは計算補助ツールです。最終判断は製品ラベル・SDS・メーカー指示を優先し、目立たない場所で必ず試験施工を行ってください</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-title">対象の外壁素材</div>
+    <div class="preset-row" id="materialRow"></div>
+    <div class="hint">素材によって使用できる薬剤・適正濃度が変わります</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">薬剤プリセット</div>
+    <div class="preset-row" id="presetRow"></div>
+
+    <div class="field" id="stockField">
+      <label for="stockConc" id="stockLabel">原液濃度</label>
+      <div class="input-wrap">
+        <input type="number" id="stockConc" inputmode="decimal" step="0.1" value="6">
+        <span class="unit" id="stockUnit">%</span>
+      </div>
+      <div class="hint" id="stockHint">製品ラベルの有効塩素濃度を入力</div>
+    </div>
+
+    <div class="field" id="targetField">
+      <label for="targetConc" id="targetLabel">目標濃度</label>
+      <div class="input-wrap">
+        <input type="number" id="targetConc" inputmode="decimal" step="10" value="200">
+        <span class="unit" id="targetUnit">ppm</span>
+      </div>
+      <div class="hint" id="targetHint">下の早見表をタップすると自動入力されます</div>
+    </div>
+
+    <div class="field" style="margin-bottom:0;">
+      <label for="totalVol">作りたい希釈液の量</label>
+      <div class="input-wrap">
+        <input type="number" id="totalVol" inputmode="decimal" step="0.5" value="10">
+        <span class="unit">L</span>
+      </div>
+      <div class="hint">タンク容量や1面あたりの使用予定量を入力(下の「面積から計算」も使えます)</div>
+    </div>
+
+    <div class="field" id="phField" style="display:none; margin-bottom:0;">
+      <label for="phInput">pH実測値(試験紙・pHメーター)</label>
+      <div class="input-wrap">
+        <input type="number" id="phInput" inputmode="decimal" step="0.1" placeholder="例: 9.2">
+        <span class="unit">pH</span>
+      </div>
+      <div class="hint">g/Lの目安だけではpHは分かりません。現場で実測した値を入れると安全範囲かどうか判定します。</div>
+      <div class="compat-box" id="phResultBox" style="display:none;"></div>
+    </div>
+
+    <div class="compat-box" id="compatBox" style="display:none;"></div>
+    <div class="safety-block" id="safetyBlock"></div>
+
+    <div class="note-static">
+      その他の危険な組み合わせ: 一般洗剤(アニオン界面活性剤)とカチオン系薬剤(塩化ベンザルコニウム等)を混ぜると、互いの洗浄・除菌効果が打ち消されます。
+    </div>
+  </div>
+
+  <div class="result-card">
+    <div class="beaker-wrap" id="beakerWrap"><svg id="beakerSvg" width="64" height="90" viewBox="0 0 64 90"></svg></div>
+    <div class="result-nums">
+      <div class="gram-emphasis" id="gramEmphasis" style="display:none;"></div>
+      <div class="result-row"><span class="result-label" id="outConcLabel">原液</span><span class="result-value conc" id="outConc">–</span></div>
+      <div class="result-row"><span class="result-label">水</span><span class="result-value water" id="outWater">–</span></div>
+      <div class="result-row"><span class="result-label" id="outRatioLabel">希釈倍率</span><span class="result-value" id="outRatio">–</span></div>
+    </div>
+  </div>
+  <div class="warn" id="warnBox"></div>
+  <div class="rinse-box" id="rinseBox"></div>
+
+  <div class="card">
+    <div class="card-title clickable" id="areaToggle">
+      面積から必要量を計算
+      <span class="toggle-arrow" id="areaArrow">▾</span>
+    </div>
+    <div class="area-body" id="areaBody">
+      <div class="field">
+        <label for="areaInput">施工面積</label>
+        <div class="input-wrap"><input type="number" id="areaInput" inputmode="decimal" step="1" placeholder="例: 120"><span class="unit">㎡</span></div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="coverageSelect">用途(使用量目安)</label>
+        <div class="input-wrap"><select id="coverageSelect"></select></div>
+        <div class="hint" id="coverageHint"></div>
+      </div>
+      <button class="apply-btn" id="applyAreaBtn">この面積から液量を計算して反映</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">外壁洗浄 目標濃度の早見表(次亜塩素酸Na)</div>
+    <table class="ref-table">
+      <thead><tr><th>用途</th><th>薬剤</th><th>目安濃度</th></tr></thead>
+      <tbody id="refBody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>
+  数値は目安です。<strong>最終判断は製品ラベル・SDS・メーカー指示を優先してください。必ず目立たない場所で試験施工を行ってから本施工してください。</strong>
+</footer>
+
+<script>
+  // ---- 薬剤プリセット ----
+  // mode: "ppm"(塩素濃度%→ppm換算) / "dilution"(液体を◯倍に希釈) / "gram"(粉末をg/Lで溶かす)
+  // category: 素材適合性データの参照キー
+  const presets = [
+    { id:"naj6", name:"次亜塩素酸Na 6%", mode:"ppm", category:"naj",
+      stockDefault:6, targetDefault:200,
+      ppe:["ゴム手袋","保護メガネ","換気"],
+      mixNote:"酸性薬剤(サビ取り剤など)と混ぜると有毒な塩素ガスが発生します。絶対に併用しないでください。" },
+    { id:"naj12", name:"次亜塩素酸Na 12%", mode:"ppm", category:"naj",
+      stockDefault:12, targetDefault:200,
+      ppe:["ゴム手袋","保護メガネ","保護マスク","換気"],
+      mixNote:"酸性薬剤(サビ取り剤など)と混ぜると有毒な塩素ガスが発生します。絶対に併用しないでください。" },
+    { id:"neutral", name:"中性洗剤", mode:"dilution", category:"neutral",
+      targetDefault:50,
+      ppe:["ゴム手袋"], mixNote:"" },
+    { id:"sesqui", name:"セスキ炭酸ソーダ", mode:"gram", category:"alkaline",
+      targetDefault:8,
+      ppe:["ゴム手袋"],
+      mixNote:"",
+      strengthNote:"弱アルカリ性の洗浄剤です(目安pH9.8〜10)。素材によっては強アルカリ域(pH13以上)にならないよう濃度に注意してください。" }
+  ];
+
+  // ---- 素材データ ----
+  // uncertain: true のものはNotebookLMソースに直接記載がなく、類似素材からの一般的な推測
+  const materials = [
+    {
+      id:"siding", name:"窯業系サイディング",
+      compat:{
+        naj:{ level:"caution", text:"200〜500ppmから試験施工を開始。頑固な黒カビ・藻には最大1000ppmまで段階的に。チョーキング(白亜化)面は薬剤が浸透しやすいため特に慎重に。", min:200, max:1000 },
+        alkaline:{ level:"caution", text:"弱アルカリ性(pH8〜10)推奨。強アルカリ性(pH13以上)は塗膜の艶低下・変色のリスクがあるため避ける。" },
+        neutral:{ level:"ok", text:"比較的安全に使用できます。" }
+      }
+    },
+    {
+      id:"metal", name:"金属外壁(ガルバリウム・アルミ等)",
+      compat:{
+        naj:{ level:"no", text:"原則使用不可。孔食(小さな穴があく腐食)を引き起こします。どうしても使う場合は徹底した養生・短時間接触・即時の清水洗いが必須です。" },
+        alkaline:{ level:"no", text:"強アルカリ性は点食・白サビの原因になります。使用は避けてください。" },
+        neutral:{ level:"ok", text:"中性洗浄剤(非イオン界面活性剤)が原則です。" }
+      }
+    },
+    {
+      id:"mortar", name:"モルタル・ALC(塗装あり)",
+      compat:{
+        naj:{ level:"caution", text:"200〜500ppmを目安に。目地など強い部位に限り1000ppmを使うことも。塗膜がない・クラックがある部分は内部浸透するため十分な水洗が必要。", min:200, max:1000 },
+        alkaline:{ level:"caution", text:"弱アルカリ性が適します。強アルカリ性は乾燥後の白華(エフロレッセンス)を助長するため注意。" },
+        neutral:{ level:"ok", text:"比較的安全に使用できます。" }
+      }
+    },
+    {
+      id:"lithin_stucco", name:"リシン・スタッコ",
+      uncertain:true,
+      compat:{
+        naj:{ level:"caution", text:"多孔質で薬剤を吸い込みやすく、凹凸に薬剤が溜まりやすい仕上げです。200〜500ppm程度から試験施工し、十分な水洗いを行ってください。", min:200, max:500 },
+        alkaline:{ level:"caution", text:"下地はモルタル系に近いですが仕上げ材の種類で耐性が異なります。弱アルカリ性から試し、白華(エフロレッセンス)の発生に注意してください。" },
+        neutral:{ level:"ok", text:"比較的安全に使用できます。" }
+      }
+    },
+    {
+      id:"design_coat", name:"意匠系塗り壁(ジョリパット等)",
+      uncertain:true,
+      compat:{
+        naj:{ level:"caution", text:"アクリル・シリコン系の樹脂仕上げ材のため、樹脂系素材に準じた扱いを推奨します。200ppm程度の低濃度から開始し、長時間の接触は避けてください。", min:200, max:200 },
+        alkaline:{ level:"caution", text:"中性〜弱アルカリ性が無難です。強アルカリは意匠面の艶低下・変色のリスクがあります。" },
+        neutral:{ level:"ok", text:"比較的安全に使用できます。" }
+      }
+    }
+  ];
+
+  const refData = [
+    { use:"カビ・藻の除去", chem:"次亜塩素酸Na", ppm:200 },
+    { use:"軽度の汚れ洗浄", chem:"次亜塩素酸Na", ppm:100 },
+    { use:"頑固なカビ・黒ずみ", chem:"次亜塩素酸Na", ppm:500 },
+    { use:"コケ予防(仕上げ散布)", chem:"次亜塩素酸Na", ppm:50 },
+  ];
+
+  const coverageOptions = [
+    { label:"低圧洗浄・前処理散布", mlPerSqm:100 },
+    { label:"高圧洗浄前の下地馴染ませ", mlPerSqm:70 },
+    { label:"仕上げ・防カビ散布", mlPerSqm:30 },
+  ];
+
+  let currentPreset = presets[0];
+  let currentMaterial = materials[0];
+
+  const stockField = document.getElementById("stockField");
+  const stockConcEl = document.getElementById("stockConc");
+  const stockLabel = document.getElementById("stockLabel");
+  const stockUnit = document.getElementById("stockUnit");
+  const stockHint = document.getElementById("stockHint");
+
+  const targetConcEl = document.getElementById("targetConc");
+  const targetLabel = document.getElementById("targetLabel");
+  const targetUnit = document.getElementById("targetUnit");
+  const targetHint = document.getElementById("targetHint");
+
+  const totalVolEl = document.getElementById("totalVol");
+  const presetRow = document.getElementById("presetRow");
+  const materialRow = document.getElementById("materialRow");
+  const refBody = document.getElementById("refBody");
+  const warnBox = document.getElementById("warnBox");
+  const rinseBox = document.getElementById("rinseBox");
+  const safetyBlock = document.getElementById("safetyBlock");
+  const compatBox = document.getElementById("compatBox");
+  const phField = document.getElementById("phField");
+  const phInput = document.getElementById("phInput");
+  const phResultBox = document.getElementById("phResultBox");
+
+  const outConcLabel = document.getElementById("outConcLabel");
+  const outRatioLabel = document.getElementById("outRatioLabel");
+  const outConc = document.getElementById("outConc");
+  const outWater = document.getElementById("outWater");
+  const outRatio = document.getElementById("outRatio");
+  const beakerWrap = document.getElementById("beakerWrap");
+  const gramEmphasis = document.getElementById("gramEmphasis");
+
+  const coverageSelect = document.getElementById("coverageSelect");
+  const coverageHint = document.getElementById("coverageHint");
+  const areaInput = document.getElementById("areaInput");
+  const areaToggle = document.getElementById("areaToggle");
+  const areaBody = document.getElementById("areaBody");
+  const areaArrow = document.getElementById("areaArrow");
+
+  function renderMaterials(){
+    materialRow.innerHTML = "";
+    materials.forEach((m, i) => {
+      const btn = document.createElement("button");
+      btn.className = "preset-btn material" + (i === 0 ? " active" : "");
+      btn.textContent = m.name;
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".preset-btn.material").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentMaterial = m;
+        renderCompat();
+        calc();
+      });
+      materialRow.appendChild(btn);
+    });
+  }
+
+  function renderPresets(){
+    presetRow.innerHTML = "";
+    presets.forEach((p, i) => {
+      const btn = document.createElement("button");
+      btn.className = "preset-btn" + (i === 0 ? " active" : "");
+      btn.textContent = p.name;
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#presetRow .preset-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentPreset = p;
+        if (p.stockDefault !== undefined && p.stockDefault !== null) stockConcEl.value = p.stockDefault;
+        if (p.targetDefault !== undefined) targetConcEl.value = p.targetDefault;
+        phInput.value = "";
+        applyPresetMode();
+        calc();
+      });
+      presetRow.appendChild(btn);
+    });
+  }
+
+  function applyPresetMode(){
+    if (currentPreset.mode === "ppm") {
+      stockField.style.display = "";
+      stockLabel.textContent = "原液濃度";
+      stockUnit.textContent = "%";
+      stockHint.textContent = "製品ラベルの有効塩素濃度を入力";
+      targetLabel.textContent = "目標濃度";
+      targetUnit.textContent = "ppm";
+      targetHint.textContent = "下の早見表をタップすると自動入力されます";
+    } else if (currentPreset.mode === "dilution") {
+      stockField.style.display = "none";
+      targetLabel.textContent = "希釈倍率";
+      targetUnit.textContent = "倍";
+      targetHint.textContent = "製品ラベルの指定希釈倍率を入力してください(例: 「100倍に希釈」なら100)";
+    } else if (currentPreset.mode === "gram") {
+      stockField.style.display = "none";
+      targetLabel.textContent = "使用濃度";
+      targetUnit.textContent = "g/L";
+      targetHint.textContent = "水1Lあたりに溶かす量(g)。" + (currentPreset.strengthNote || "");
+    }
+    phField.style.display = currentPreset.mode === "gram" ? "" : "none";
+    if (currentPreset.mode !== "gram") { phResultBox.style.display = "none"; }
+    renderSafety();
+    renderCompat();
+    evaluatePh();
+  }
+
+  function renderSafety(){
+    safetyBlock.innerHTML = "";
+    if (currentPreset.ppe && currentPreset.ppe.length){
+      const wrap = document.createElement("div");
+      const label = document.createElement("div");
+      label.className = "hint";
+      label.textContent = "必要な保護具";
+      wrap.appendChild(label);
+      const row = document.createElement("div");
+      row.className = "ppe-row";
+      currentPreset.ppe.forEach(item => {
+        const chip = document.createElement("span");
+        chip.className = "ppe-chip";
+        chip.textContent = item;
+        row.appendChild(chip);
+      });
+      wrap.appendChild(row);
+      safetyBlock.appendChild(wrap);
+    }
+    if (currentPreset.mixNote){
+      const mix = document.createElement("div");
+      mix.className = "mix-warn";
+      mix.textContent = "⚠ 混合禁忌: " + currentPreset.mixNote;
+      safetyBlock.appendChild(mix);
+    }
+  }
+
+  function renderCompat(){
+    const info = currentMaterial.compat[currentPreset.category];
+    if (!info){
+      compatBox.style.display = "none";
+      return;
+    }
+    compatBox.style.display = "block";
+    compatBox.className = "compat-box " + info.level;
+    const icon = info.level === "ok" ? "✅" : info.level === "caution" ? "⚠" : "🚫";
+    const label = info.level === "ok" ? "使用可" : info.level === "caution" ? "使用可(注意が必要)" : "原則使用不可";
+    let html = `<div class="compat-title">${icon} ${currentMaterial.name} × ${currentPreset.name}: ${label}</div>${info.text}`;
+    if (currentMaterial.uncertain) {
+      html += `<div class="compat-est">※ このデータは類似素材からの一般的な推定です。ソース資料に直接の記載はありません。必ず目立たない場所で試験施工を行ってください。</div>`;
+    }
+    compatBox.innerHTML = html;
+
+    if (currentPreset.mode === "ppm" && info.min) {
+      targetConcEl.placeholder = `目安 ${info.min}〜${info.max || info.min} ppm`;
+    } else {
+      targetConcEl.placeholder = "";
+    }
+  }
+
+  function evaluatePh(){
+    if (currentPreset.mode !== "gram") { phResultBox.style.display = "none"; return; }
+    const ph = parseFloat(phInput.value);
+    if (!isFinite(ph)) { phResultBox.style.display = "none"; return; }
+
+    let level, text;
+    if (ph >= 13) {
+      level = "no";
+      text = "強アルカリ域です。塗膜の艶低下・変色、金属素材では腐食のリスクがあります。濃度を下げるか使用を再検討してください。";
+    } else if (ph > 10) {
+      level = "caution";
+      text = "一般的な推奨範囲(pH8〜10)をやや超えています。目立たない場所で試し洗いをして、素材への影響を確認してください。";
+    } else if (ph >= 8) {
+      level = "ok";
+      text = "一般的な推奨範囲(pH8〜10)内です。";
+    } else {
+      level = "caution";
+      text = "アルカリ度がやや低めです。汚れが落ちにくい場合は、濃度を上げるか浸け置き時間を長くしてください。";
+    }
+    phResultBox.style.display = "block";
+    phResultBox.className = "compat-box " + level;
+    phResultBox.textContent = text;
+  }
+  phInput.addEventListener("input", evaluatePh);
+
+  function renderRefTable(){
+    refBody.innerHTML = "";
+    refData.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.className = "ref-row";
+      tr.innerHTML = `<td>${r.use}</td><td>${r.chem}</td><td class="num">${r.ppm} ppm</td>`;
+      tr.addEventListener("click", () => {
+        if (currentPreset.mode !== "ppm") return;
+        targetConcEl.value = r.ppm;
+        calc();
+      });
+      refBody.appendChild(tr);
+    });
+  }
+
+  function renderCoverageOptions(){
+    coverageSelect.innerHTML = "";
+    coverageOptions.forEach((c, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${c.label}(${c.mlPerSqm}ml/㎡)`;
+      coverageSelect.appendChild(opt);
+    });
+    updateCoverageHint();
+  }
+  function updateCoverageHint(){
+    const c = coverageOptions[coverageSelect.value];
+    coverageHint.textContent = `目安: 1㎡あたり約${c.mlPerSqm}ml`;
+  }
+
+  function drawBeaker(fraction){
+    const svg = document.getElementById("beakerSvg");
+    const f = Math.max(0, Math.min(1, fraction));
+    const top = 8, bottom = 82, left = 10, right = 54;
+    const liquidTop = bottom - (bottom - top) * f;
+    svg.innerHTML = `
+      <defs><clipPath id="beakerClip">
+        <path d="M ${left} ${top} L ${left-2} ${bottom} Q ${left-2} ${bottom+4} ${left+4} ${bottom+4} L ${right-4} ${bottom+4} Q ${right+2} ${bottom+4} ${right+2} ${bottom} L ${right} ${top} Z"/>
+      </clipPath></defs>
+      <rect x="${left}" y="${liquidTop}" width="${right-left+2}" height="${bottom-liquidTop+4}" fill="#e8a400" clip-path="url(#beakerClip)"/>
+      <path d="M ${left} ${top} L ${left-2} ${bottom} Q ${left-2} ${bottom+4} ${left+4} ${bottom+4} L ${right-4} ${bottom+4} Q ${right+2} ${bottom+4} ${right+2} ${bottom} L ${right} ${top}"
+            fill="none" stroke="#f0eee7" stroke-width="2.5" stroke-linejoin="round"/>
+      <line x1="${left-4}" y1="${top}" x2="${right+4}" y2="${top}" stroke="#f0eee7" stroke-width="2.5"/>
+    `;
+  }
+
+  function fmt(n){ if (!isFinite(n)) return "–"; return n.toLocaleString("ja-JP",{maximumFractionDigits:1}); }
+
+  function resetOutputs(){
+    outConc.textContent = "–"; outWater.textContent = "–"; outRatio.textContent = "–";
+    warnBox.classList.remove("show"); drawBeaker(0);
+  }
+
+  function updateRinseBox(totalL){
+    if (!totalL || totalL <= 0) { rinseBox.classList.remove("show"); return; }
+    const minL = totalL * 3;
+    const maxL = totalL * 5;
+    rinseBox.textContent = `すすぎ目安: 使用後は清水で十分に洗い流してください。散布量(${fmt(totalL)}L)の3〜5倍 → 約${fmt(minL)}〜${fmt(maxL)}Lの清水ですすぐことを目安にしてください。`;
+    rinseBox.classList.add("show");
+  }
+
+  function applyMaterialWarning(){
+    const info = currentMaterial.compat[currentPreset.category];
+    if (info && info.level === "no") {
+      warnBox.textContent = `${currentMaterial.name}にはこの薬剤系統は原則使用しません。上の適合性表示を確認してください。`;
+      warnBox.classList.add("show");
+      return true;
+    }
+    if (currentPreset.mode === "ppm" && info && info.max) {
+      const targetRaw = parseFloat(targetConcEl.value);
+      if (targetRaw > info.max) {
+        warnBox.textContent = `${currentMaterial.name}の推奨上限(${info.max}ppm)を超えています。素材へのダメージに注意してください。`;
+        warnBox.classList.add("show");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function calc(){
+    const totalL = parseFloat(totalVolEl.value);
+    updateRinseBox(totalL);
+    outConcLabel.textContent = "原液";
+    outRatioLabel.textContent = "希釈倍率";
+    beakerWrap.style.display = "";
+    gramEmphasis.style.display = "none";
+
+    if (currentPreset.mode === "ppm") {
+      const stockPercent = parseFloat(stockConcEl.value);
+      const targetPpm = parseFloat(targetConcEl.value);
+      if (!stockPercent || !targetPpm || !totalL || stockPercent <= 0 || targetPpm <= 0 || totalL <= 0) { resetOutputs(); return; }
+
+      const fractionOfStock = targetPpm / (stockPercent * 10000);
+      warnBox.classList.remove("show");
+      if (fractionOfStock > 1) {
+        warnBox.textContent = "目標濃度が原液濃度を超えています。原液濃度・目標濃度を確認してください。";
+        warnBox.classList.add("show");
+        outConc.textContent = "計算不可"; outWater.textContent = "–"; outRatio.textContent = "–";
+        drawBeaker(0); return;
+      }
+      const stockMl = totalL * 1000 * fractionOfStock;
+      const waterL = totalL - (stockMl / 1000);
+      const ratio = 1 / fractionOfStock;
+      outConc.textContent = stockMl >= 1000 ? `${fmt(stockMl/1000)} L` : `${fmt(stockMl)} mL`;
+      outWater.textContent = `${fmt(waterL)} L`;
+      outRatio.textContent = `1 : ${fmt(ratio - 1)}`;
+      drawBeaker(fractionOfStock);
+
+      if (!applyMaterialWarning() && fractionOfStock > 0.3) {
+        warnBox.textContent = "原液の割合がかなり高めです。素材や塗膜への影響を確認してから使用してください。";
+        warnBox.classList.add("show");
+      }
+
+    } else if (currentPreset.mode === "dilution") {
+      const ratio = parseFloat(targetConcEl.value);
+      if (!ratio || !totalL || ratio <= 0 || totalL <= 0) { resetOutputs(); return; }
+      warnBox.classList.remove("show");
+      if (ratio < 1) {
+        warnBox.textContent = "希釈倍率は1以上の数値を入力してください(例: 100倍なら100)。";
+        warnBox.classList.add("show");
+        outConc.textContent = "計算不可"; outWater.textContent = "–"; outRatio.textContent = "–";
+        drawBeaker(0); return;
+      }
+      const stockMl = (totalL * 1000) / ratio;
+      const waterL = totalL - (stockMl / 1000);
+      outConc.textContent = stockMl >= 1000 ? `${fmt(stockMl/1000)} L` : `${fmt(stockMl)} mL`;
+      outWater.textContent = `${fmt(waterL)} L`;
+      outRatio.textContent = `1 : ${fmt(ratio - 1)}`;
+      drawBeaker(1 / ratio);
+      applyMaterialWarning();
+
+    } else if (currentPreset.mode === "gram") {
+      const concGL = parseFloat(targetConcEl.value);
+      if (!concGL || !totalL || concGL <= 0 || totalL <= 0) { resetOutputs(); return; }
+      warnBox.classList.remove("show");
+      const grams = concGL * totalL;
+      outConcLabel.textContent = "薬剤(粉末)";
+      outRatioLabel.textContent = "使用濃度";
+      outConc.textContent = `${fmt(grams)} g`;
+      outWater.textContent = `${fmt(totalL)} L`;
+      outRatio.textContent = `${fmt(concGL)} g/L`;
+      beakerWrap.style.display = "none";
+      gramEmphasis.style.display = "block";
+      gramEmphasis.innerHTML = `<span class="num">${fmt(totalL)}L</span> の水に <span class="num">${fmt(grams)}g</span> を投入`;
+      applyMaterialWarning();
+    }
+  }
+
+  areaToggle.addEventListener("click", () => {
+    areaBody.classList.toggle("open");
+    areaArrow.classList.toggle("open");
+  });
+  coverageSelect.addEventListener("change", updateCoverageHint);
+  document.getElementById("applyAreaBtn").addEventListener("click", () => {
+    const area = parseFloat(areaInput.value);
+    if (!area || area <= 0) { areaInput.focus(); return; }
+    const c = coverageOptions[coverageSelect.value];
+    const liters = (area * c.mlPerSqm) / 1000;
+    totalVolEl.value = fmt(liters).replace(/,/g, "");
+    calc();
+    areaBody.classList.remove("open");
+    areaArrow.classList.remove("open");
+  });
+
+  [stockConcEl, targetConcEl, totalVolEl].forEach(el => el.addEventListener("input", calc));
+
+  renderMaterials();
+  renderPresets();
+  applyPresetMode();
+  renderRefTable();
+  renderCoverageOptions();
+  calc();
+</script>
+
+</body>
+</html>
