@@ -179,14 +179,33 @@
   .apply-btn:disabled{opacity:.45;cursor:not-allowed;}
   button:focus-visible,summary:focus-visible{outline:3px solid var(--safety-dark);outline-offset:2px;}
   [hidden]{display:none!important;}
+  header{background:#e7f1f7;color:#263f54;border-bottom:1px solid #cddfe9;}
+  header::after{display:none;}
+  .brand-row{display:flex;align-items:center;gap:14px;max-width:548px;margin:0 auto;}
+  .brand-copy{min-width:0;flex:1;}
+  .brand-row .eyebrow{color:#426984;letter-spacing:.08em;}
+  .brand-row .sub{color:#496375;max-width:none;}
+  .penkin-hero{width:88px;height:100px;object-fit:contain;flex-shrink:0;}
+  .penkin-welcome{font-size:12px;line-height:1.7;margin:9px 0 0;color:#365c78;}
+  .penkin-guide{display:flex;gap:10px;align-items:center;margin-bottom:12px;}
+  .penkin-guide img{width:48px;height:56px;object-fit:contain;flex-shrink:0;}
+  .penkin-bubble{position:relative;border-radius:12px;padding:9px 12px;background:#f3f8fb;color:#294b65;font-size:12px;line-height:1.65;flex:1;min-width:0;}
+  .penkin-bubble::before{content:'';position:absolute;left:-6px;top:18px;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:7px solid #f3f8fb;}
+  @media(max-width:360px){.brand-row{gap:10px;}.penkin-hero{width:64px;height:80px;}.brand-row h1{font-size:20px;}.brand-row .sub{font-size:12px;}}
   @media(max-width:360px){main{padding:10px;}.card{padding:14px;}header{padding:18px 14px;}h1{font-size:22px;}.result-value{font-size:18px;}}
 </style>
 </head>
 <body>
 <header>
+  <div class="brand-row">
+  <img class="penkin-hero" id="penkinHero" src="./penkin.png" width="88" height="100" alt="イチケンブラザーズのペンキンくん">
+  <div class="brand-copy">
   <div class="eyebrow">一建塗装 現場ツール</div>
   <h1>薬剤希釈計算</h1>
   <div class="sub">配合量を計算します。施工濃度・素材への適合性は製品の指示を確認してください。</div>
+  <p class="penkin-welcome">ペンキンくんと、使う量を確認しよう！</p>
+  </div>
+  </div>
 </header>
 <main>
   <div class="always-warn"><strong>混ぜない・容器の薬剤履歴を確認</strong><br>製品ラベル・SDS・メーカーの施工指示を優先してください。本アプリは使用可否を判定しません。</div>
@@ -229,6 +248,7 @@
       </div>
     </div>
     <section class="result-card" aria-label="計算結果" aria-live="polite" aria-atomic="true">
+      <div class="penkin-guide"><img id="penkinGuide" width="48" height="56" alt=""><div class="penkin-bubble" id="penkinMessage">薬剤と作る量を選んでね！</div></div>
       <div class="result-context" id="resultContext"></div>
       <div class="result-row"><span class="result-label" id="outConcLabel">原液</span><span class="result-value conc" id="outConc">–</span></div>
       <div class="result-row"><span class="result-label">水</span><span class="result-value water" id="outWater">–</span></div>
@@ -336,10 +356,13 @@ let selectedMightyRatio = null;
 const positive = n => Number.isFinite(n) && n > 0;
 const read = id => $(id).value.trim() === '' ? NaN : Number($(id).value);
 const volumeInLiters = () => read('totalVol') / ($('volumeUnit').value === 'mL' ? 1000 : 1);
+// User-defined operating cap, not a material compatibility or safety threshold.
+const MAX_CHLORINE_PPM = 2000;
 
 // Pure calculation: never use rounded display values as inputs.
 function calculateMixture(mode, stock, target, totalL) {
   if (!positive(totalL) || !positive(target)) return {error:'濃度・倍率と液量には、0より大きい数値を入力してください。'};
+  if (mode === 'ppm' && target > MAX_CHLORINE_PPM) return {error:`高濃度の設定を防ぐため、次亜塩素酸Naの目標濃度は${MAX_CHLORINE_PPM}ppm以下にしてください。上限を超えているため計算しません。`};
   if (mode === 'gram') {
     const grams = target * totalL;
     return positive(grams) ? {grams, waterL:totalL, target} : {error:'数値が計算できる範囲を超えています。'};
@@ -391,6 +414,12 @@ function calc() {
   $('outRatioLabel').textContent = powder ? '水1Lあたり' : '希釈倍率';
   $('proportionRow').hidden = powder;
   $('inputError').textContent = result.error || '';
+  $('penkinMessage').textContent = result.error
+    ? (currentPreset.mode==='ppm' && target>MAX_CHLORINE_PPM
+      ? '濃くしすぎに注意！2000ppm以下にしてね。'
+      : currentPreset.allowedRatios && !currentPreset.allowedRatios.includes(target)
+        ? '使う希釈倍率を選んでね！' : '入力した数値と単位を確認してね！')
+    : powder ? '薬剤と水の量を確認してね！' : '原液と水の量を確認してね！';
   $('resultNote').textContent = powder
     ? '水量を基準に計算しています。溶解後の完成液量とは異なります。表示値は端数処理しています。投入順序は製品の指示に従ってください。'
     : '配合量の「約」は端数処理によるものです。完成量は丸め前の値で計算しています。投入順序は製品の指示に従ってください。';
@@ -429,8 +458,9 @@ function applyMode() {
   $('targetLabel').textContent=mode==='ppm'?'目標濃度':powder?'使用濃度（水1Lあたり）':'希釈倍率（完成液量 ÷ 原液量）';
   $('targetUnit').textContent=mode==='ppm'?'ppm':powder?'g/L':'倍';
   $('targetConc').min=mode==='dilution'?'1':'0';
+  $('targetConc').max=mode==='ppm'?String(MAX_CHLORINE_PPM):'';
   $('targetHint').textContent=mode==='ppm'
-    ?'初期値200ppmは計算例です。施工用の推奨濃度ではありません。確認した濃度に変更してください。'
+    ?`高濃度にしすぎないでください。アプリの運用上限は${MAX_CHLORINE_PPM}ppmです。上限以下でも素材への適合性や安全性を保証しません。製品・素材の指定濃度を優先し、試験施工で確認してください。初期値200ppmは計算例です。`
     :powder?'初期値8g/Lは計算例です。製品の指示で確認した、水1Lあたりの量を入力してください。'
     :'初期値50倍は計算例です。製品指定の倍率を入力してください。100倍＝原液1：水99。';
   $('volumeLabel').textContent=powder?'粉末を溶かす水の量':'作りたい完成液の量';
@@ -500,6 +530,7 @@ $('phInput').addEventListener('input',()=>{
   const ph=read('phInput');
   $('phResult').textContent=$('phInput').value===''?'':Number.isFinite(ph)?`入力した実測値：pH ${fmt(ph)}。適否は未判定です。`:'実測値を数値で入力してください。';
 });
+$('penkinGuide').src=$('penkinHero').src;
 applyMode();
 
 </script>
