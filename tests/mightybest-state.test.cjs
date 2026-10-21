@@ -35,6 +35,7 @@ let checks=0;
 const check=(name,fn)=>{fn();checks++;console.log('PASS',name);};
 check('initial Mighty state ignores prior ppm and hides free input',()=>{
  preset('mightybest');blank();
+ assert.equal(node('penkinMessage').textContent,'使う希釈倍率を選んでね！');
  assert.equal(node('targetConc').disabled,true);assert.equal(node('targetField').hidden,true);
  assert.equal(node('mightyDilutionField').hidden,false);assert.equal(node('mightyDilutionField').disabled,false);
  assert.ok(radios.every(r=>!r.checked));assert.match(node('inputError').textContent,/希釈倍率を選んでください/);
@@ -77,5 +78,22 @@ check('Mighty evidence and drying warning are scoped to that product',()=>{
  preset('neutral');assert.equal(node('mightyEvidence').hidden,true);
  assert.equal(node('genericEvidence').hidden,false);assert.equal(node('mightyDryingWarning').hidden,true);
  set('targetConc',5);assert.equal(node('outRatio').textContent,'5 倍');
+});
+check('both chlorine presets block excessive concentrations and clear stale recipes',()=>{
+ for(const id of ['naj6','naj12']) {
+  preset(id);assert.equal(node('targetConc').max,'2000');
+  assert.match(node('targetHint').textContent,/高濃度にしすぎない/);
+  assert.match(node('targetHint').textContent,/保証しません/);
+  set('targetConc',2000);assert.ok(!node('inputError').textContent);
+  set('targetConc',2001);blank();assert.match(node('inputError').textContent,/2000ppm以下/);
+  assert.equal(node('penkinMessage').textContent,'濃くしすぎに注意！2000ppm以下にしてね。');
+  volumes[2].listeners.click();blank();
+  set('volumeUnit','mL','change');blank();
+  set('targetConc',1000);assert.ok(!node('inputError').textContent);
+  assert.equal(node('penkinMessage').textContent,'原液と水の量を確認してね！');
+ }
+ preset('neutral');assert.equal(node('targetConc').max,'');
+ set('targetConc',3000);assert.equal(node('outRatio').textContent,'3,000 倍');
+ preset('mightybest');blank();choose(10);assert.equal(node('outRatio').textContent,'10 倍');
 });
 console.log(`${checks} controller state groups passed (layout/keyboard require browser QA).`);

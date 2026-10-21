@@ -23,7 +23,7 @@ check('100x: 1:99 and 100mL+9.9L',()=>{
  assert.equal(r.stockL,0.1);assert.equal(r.waterL,9.9);assert.equal(r.ratio-1,99);
 });
 check('ppm and dilution modes agree',()=>{
- for (const ratio of [1,1.5,100,300,1200]) {
+ for (const ratio of [60,100,300,1200]) {
   const a=calc('ppm',12,120000/ratio,20),b=calc('dilution',NaN,ratio,20);
   assert.ok(Math.abs(a.stockL-b.stockL)<1e-12);assert.ok(Math.abs(a.waterL-b.waterL)<1e-12);
  }
@@ -47,6 +47,18 @@ check('very small amounts never display zero',()=>{
  assert.notEqual(context.waterAmount(r.waterL,10),'10 L');
 });
 check('1x uses no water',()=>{const r=calc('dilution',NaN,1,5);assert.equal(r.stockL,5);assert.equal(r.waterL,0);});
+check('chlorine operating cap: 2000ppm accepted, every higher target rejected',()=>{
+ for(const stock of [6,12]) {
+  const r=calc('ppm',stock,2000,10);
+  assert.ok(!r.error);assert.equal(r.ratio,stock*10000/2000);
+  for(const target of [2000.0001,2001,3000,60000,120000]) {
+   const bad=calc('ppm',stock,target,10);
+   assert.match(bad.error,/2000ppm以下/);assert.equal(bad.stockL,undefined);
+  }
+ }
+ assert.ok(!calc('dilution',NaN,3000,10).error);
+ assert.ok(!calc('gram',NaN,2001,10).error);
+});
 const mighty=vm.runInContext("presets.find(p=>p.id==='mightybest')",context);
 check('Mighty Best: all three choices conserve 5L, 10L and 20L',()=>{
  for(const total of [5,10,20]) for(const ratio of [10,15,20]) {
