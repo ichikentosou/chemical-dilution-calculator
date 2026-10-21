@@ -146,6 +146,17 @@
   .volume-unit{flex:0 0 72px!important;}
   .volume-buttons{display:flex;gap:8px;margin-top:8px;}
   .volume-buttons button{flex:1;min-width:0;min-height:44px;}
+  .dilution-field{border:0;padding:0;margin:0 0 14px;min-width:0;}
+  .dilution-field legend{font-size:12px;font-weight:700;color:#5a564c;margin-bottom:6px;}
+  .dilution-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+  .dilution-choice{position:relative;margin:0;min-width:0;cursor:pointer;}
+  .dilution-choice input{position:absolute;opacity:0;width:1px;height:1px;}
+  .dilution-choice span{display:block;border:2px solid var(--line);border-radius:3px;padding:10px 2px;min-height:64px;text-align:center;background:var(--paper);font-size:16px;}
+  .dilution-choice small{display:block;font-size:12px;margin-top:4px;}
+  .dilution-choice input:checked + span{background:var(--ink);border-color:var(--safety-dark);color:var(--paper);}
+  .dilution-choice input:focus-visible + span{outline:3px solid var(--safety-dark);outline-offset:2px;}
+  .product-warning{font-size:12px;line-height:1.7;color:#7a3323;margin-top:10px;}
+  .source-links a{overflow-wrap:anywhere;}
   .result-card{display:block;margin-top:14px;padding:16px;}
   .result-row{gap:8px;flex-wrap:wrap;}
   .result-value{font-size:20px;overflow-wrap:anywhere;max-width:100%;}
@@ -194,11 +205,20 @@
       <div class="input-wrap"><input type="number" id="stockConc" inputmode="decimal" step="any" min="0" max="100" value="6" aria-describedby="stockHint"><span class="unit">%</span></div>
       <div class="hint" id="stockHint">ラベルの濃度を入力。質量・体積の基準については下の「計算方法」を確認してください。</div>
     </div>
-    <div class="field">
+    <div class="field" id="targetField">
       <label for="targetConc" id="targetLabel">目標濃度</label>
       <div class="input-wrap"><input type="number" id="targetConc" inputmode="decimal" step="any" min="0" value="200" aria-describedby="targetHint"><span class="unit" id="targetUnit">ppm</span></div>
       <div class="hint" id="targetHint"></div>
     </div>
+    <fieldset class="dilution-field" id="mightyDilutionField" aria-describedby="mightyDilutionHint" hidden disabled>
+      <legend>希釈倍率を選んでください</legend>
+      <div class="dilution-options">
+        <label class="dilution-choice"><input type="radio" name="mightyDilution" value="20"><span>20倍<small>薄め</small></span></label>
+        <label class="dilution-choice"><input type="radio" name="mightyDilution" value="15"><span>15倍<small>中間</small></span></label>
+        <label class="dilution-choice"><input type="radio" name="mightyDilution" value="10"><span>10倍<small>濃いめ</small></span></label>
+      </div>
+      <div class="hint" id="mightyDilutionHint">試験洗浄で汚れの落ち方を確認して選択してください。10・15・20倍は自社の運用上の選択肢で、汚れ別のメーカー指定値ではありません。</div>
+    </fieldset>
     <div class="field" style="margin-bottom:0">
       <label for="totalVol" id="volumeLabel">作りたい完成液の量</label>
       <div class="input-wrap"><input type="number" id="totalVol" inputmode="decimal" step="any" min="0" value="10"><select id="volumeUnit" class="volume-unit" aria-label="液量の単位"><option value="L">L</option><option value="mL">mL</option></select></div>
@@ -219,6 +239,7 @@
     </section>
     <div class="error" id="inputError" role="alert"></div>
     <div class="mix-warn" id="mixWarning"></div>
+    <p class="product-warning" id="mightyDryingWarning" hidden>高温の壁面や、塗布後すぐ乾く条件での使用方法は未確認です。希釈倍率を濃くして解決せず、メーカーの施工指示を確認してください。</p>
     <p class="section-note"><span class="status">素材適合性・施工濃度：未確認</span><br>計算結果は、使用可否や洗浄効果を保証するものではありません。</p>
   </section>
 
@@ -241,12 +262,42 @@
 
   <details class="card" id="evidenceDetails">
     <summary>施工目安の根拠・確認状況</summary>
+    <div id="genericEvidence">
     <p>対象製品・対象素材・条件を確認できる資料や自社試験記録は、まだ登録されていません。製品ラベル・SDS・メーカーの施工指示を優先してください。</p>
     <dl class="evidence-list">
       <dt>メーカー資料で確認済み</dt><dd>登録なし。対象製品・素材・条件・資料名・URL・確認日をそろえてから掲載します。</dd>
       <dt>自社試験条件</dt><dd>登録なし。試験日・製品・素材・濃度・接触時間・結果を記録し、確認した範囲を明示します。</dd>
       <dt>一般的な推定・根拠未確認</dt><dd>旧版の素材別使用可否、濃度目安・上限、用途別早見表、仕上げ・予防散布、すすぎ3〜5倍、固定使用量、pHの推奨範囲は根拠未確認のため、案内と自動判定を保留しています。</dd>
     </dl>
+    </div>
+    <div id="mightyEvidence" hidden>
+      <p><strong>マイティーベストα／サンエスエンジニアリング</strong><br>公式ページ確認日：2026年10月21日。公開情報の確認であり、選択した素材・既存塗膜での使用可否を確認したものではありません。</p>
+      <dl class="evidence-list">
+        <dt>メーカー公開情報で確認済み</dt>
+        <dd>外壁の油・煤煙・水あかを対象とする、低発泡のアルカリ性液体洗浄剤です。公開希釈範囲は原液〜20倍。標準手順の概要は、塗布後3〜5分置き、こすり洗いまたは高圧洗浄をして、十分に水ですすぐ流れです。条件によって異なるため、製品ラベル等の指示を確認してください。</dd>
+        <dt>自社の運用設定：10・15・20倍の3択</dt>
+        <dd>本アプリではこの3つから手動で選びます。15倍を含め、汚れ別の使い分けをメーカーが個別に指定した事実は確認できていません。自社の施工試験記録も未登録です。</dd>
+        <dt>未確認事項</dt>
+        <dd>SDS詳細・成分と含有量・原液と希釈液のpH、素材・既存塗膜・サッシへの適合性と使用条件、製品固有のmL/㎡、高温壁面・直射日光下の条件、すすぎ前の乾燥の可否と対処、事前の水濡らし・壁面冷却・作業中の加水の可否は未確認です。</dd>
+      </dl>
+      <details>
+        <summary>試験洗浄での選び方（自社の判断手順案）</summary>
+        <ol>
+          <li>対象素材・塗膜への使用条件を確認する。</li>
+          <li>20倍で試験し、必要な仕上がりになるか確認する。</li>
+          <li>不十分なら同等の別区画で15倍、必要に応じ10倍を比較する。</li>
+          <li>塗布量・接触時間・ブラッシング条件をそろえる。すすぎ後、壁が乾いてから汚れ残りと色・艶の変化を確認する。</li>
+          <li>倍率を変えても改善しない場合は濃くすることを続けず、汚れの種類と施工方法を見直す。</li>
+        </ol>
+        <p>メーカー指定の施工要領ではありません。20倍なら安全、10倍なら必ず落ちるという意味ではありません。</p>
+      </details>
+      <ul class="source-links">
+        <li><a href="https://sanesu-eng.co.jp/product/detail/マイティーベストα/" target="_blank" rel="noopener noreferrer">メーカー公式製品ページ</a></li>
+        <li><a href="https://www.sanes.jp/product/mightybest%CE%B1/" target="_blank" rel="noopener noreferrer">メーカー公開製品ページ・標準手順の注記</a></li>
+        <li><a href="https://sanesu-eng.co.jp/topics/news/2219" target="_blank" rel="noopener noreferrer">テント倉庫の壁面洗浄事例</a>：高所ポールによるこすり洗い。原液〜数倍での事例であり、本アプリの10・15・20倍の効果を示すものではありません。</li>
+        <li><a href="https://sanesu-eng.co.jp/contact" target="_blank" rel="noopener noreferrer">メーカーお問い合わせ・資料請求</a>：購入先がある場合、SDSは購入先へ請求する案内があります。</li>
+      </ul>
+    </div>
     <p>必要な保護具・すすぎ方法・投入順序も製品の指定を確認し、施工前に目立たない場所で試験してください。</p>
   </details>
   <details class="card" id="methodDetails">
@@ -268,6 +319,7 @@ const presets = [
   {id:'naj6', name:'次亜塩素酸Na 6%', mode:'ppm', stock:6, target:200},
   {id:'naj12', name:'次亜塩素酸Na 12%', mode:'ppm', stock:12, target:200},
   {id:'neutral', name:'中性洗剤（倍率で計算）', mode:'dilution', target:50},
+  {id:'mightybest', name:'マイティーベストα（外壁用アルカリ洗浄剤）', mode:'dilution', allowedRatios:[10,15,20]},
   {id:'sesqui', name:'セスキ炭酸ソーダ（粉末）', mode:'gram', target:8}
 ];
 const materials = [
@@ -280,6 +332,7 @@ const materials = [
 const $ = id => document.getElementById(id);
 let currentPreset = presets[0];
 let previousVolumeUnit = 'L';
+let selectedMightyRatio = null;
 const positive = n => Number.isFinite(n) && n > 0;
 const read = id => $(id).value.trim() === '' ? NaN : Number($(id).value);
 const volumeInLiters = () => read('totalVol') / ($('volumeUnit').value === 'mL' ? 1000 : 1);
@@ -298,6 +351,13 @@ function calculateMixture(mode, stock, target, totalL) {
   const waterL = totalL - stockL;
   if (!positive(stockL) || !Number.isFinite(waterL)) return {error:'数値が計算できる範囲を超えています。'};
   return {stockL, waterL, totalL, ratio};
+}
+// Enforce product-specific choices at the calculation boundary as well as in the UI.
+function calculateForPreset(preset, stock, target, totalL) {
+  if (preset.allowedRatios && !preset.allowedRatios.includes(target)) {
+    return {error:'希釈倍率を選んでください（10・15・20倍）。'};
+  }
+  return calculateMixture(preset.mode, stock, target, totalL);
 }
 function fmt(n, digits=3) {
   if (!Number.isFinite(n)) return '–';
@@ -322,7 +382,8 @@ function setVolume(liters) {
 function calc() {
   const powder = currentPreset.mode === 'gram';
   const totalL = volumeInLiters();
-  const result = calculateMixture(currentPreset.mode, read('stockConc'), read('targetConc'), totalL);
+  const target = currentPreset.allowedRatios ? selectedMightyRatio : read('targetConc');
+  const result = calculateForPreset(currentPreset, read('stockConc'), target, totalL);
   const chemicalLabel = currentPreset.mode === 'ppm' ? `次亜塩素酸Na（原液 ${fmt(read('stockConc'),6)}%）` : currentPreset.name;
   $('resultContext').textContent = `${materials.find(m=>m.id === $('materialSelect').value).name} ／ ${chemicalLabel}`;
   $('outConcLabel').textContent = powder ? '薬剤（粉末）' : '原液';
@@ -356,6 +417,14 @@ function calc() {
 }
 function applyMode() {
   const mode=currentPreset.mode, powder=mode==='gram';
+  const mighty=currentPreset.id==='mightybest';
+  $('targetField').hidden=mighty;
+  $('targetConc').disabled=mighty;
+  $('mightyDilutionField').hidden=!mighty;
+  $('mightyDilutionField').disabled=!mighty;
+  $('mightyDryingWarning').hidden=!mighty;
+  $('genericEvidence').hidden=mighty;
+  $('mightyEvidence').hidden=!mighty;
   $('stockField').hidden=mode!=='ppm';
   $('targetLabel').textContent=mode==='ppm'?'目標濃度':powder?'使用濃度（水1Lあたり）':'希釈倍率（完成液量 ÷ 原液量）';
   $('targetUnit').textContent=mode==='ppm'?'ppm':powder?'g/L':'倍';
@@ -395,13 +464,20 @@ $('materialSelect').addEventListener('change',calc);
 $('presetSelect').addEventListener('change',()=>{
   currentPreset=presets.find(p=>p.id===$('presetSelect').value);
   if(currentPreset.stock) $('stockConc').value=currentPreset.stock;
-  $('targetConc').value=currentPreset.target;
+  $('targetConc').value=currentPreset.target ?? '';
+  selectedMightyRatio=null;
+  document.querySelectorAll('input[name="mightyDilution"]').forEach(r=>r.checked=false);
   $('phInput').value=''; $('phResult').textContent='';
   // Area coverage changes meaning between water and finished liquid: require re-entry.
   $('coverageInput').value='';
   applyMode();
 });
 ['stockConc','targetConc','totalVol'].forEach(id=>$(id).addEventListener('input',calc));
+document.querySelectorAll('input[name="mightyDilution"]').forEach(r=>r.addEventListener('change',()=>{
+  if(currentPreset.id!=='mightybest') return;
+  selectedMightyRatio=Number(r.value);
+  calc();
+}));
 $('volumeUnit').addEventListener('change',()=>{
   const input=read('totalVol');
   if (Number.isFinite(input)) {
